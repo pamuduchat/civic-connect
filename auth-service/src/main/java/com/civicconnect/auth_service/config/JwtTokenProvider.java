@@ -1,6 +1,7 @@
 package com.civicconnect.auth_service.config;
 
 import com.civicconnect.auth_service.model.UserRole;
+import lombok.extern.log4j.Log4j2;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import io.jsonwebtoken.*;
@@ -8,8 +9,8 @@ import io.jsonwebtoken.*;
 import java.util.Date;
 
 @Component
+@Log4j2
 public class JwtTokenProvider {
-
     @Value("${app.jwtSecret}")
     private String jwtSecret;
 
@@ -20,7 +21,6 @@ public class JwtTokenProvider {
     private int refreshTokenExpirationInMs;
 
     public String generateToken(String username, UserRole role) {
-        // Generate JWT token
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtExpirationInMs);
         return Jwts.builder()
@@ -33,7 +33,6 @@ public class JwtTokenProvider {
     }
 
     public String generateRefreshToken(String username) {
-        // Generate Refresh token
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + refreshTokenExpirationInMs);
         return Jwts.builder()
@@ -56,16 +55,9 @@ public class JwtTokenProvider {
         try {
             Jwts.parser().setSigningKey(jwtSecret).parseClaimsJws(authToken);
             return true;
-        } catch (SignatureException ex) {
-            // Log invalid signature
-        } catch (MalformedJwtException ex) {
-            // Log malformed JWT
-        } catch (ExpiredJwtException ex) {
-            // Log expired JWT
-        } catch (UnsupportedJwtException ex) {
-            // Log unsupported JWT
-        } catch (IllegalArgumentException ex) {
-            // Log empty or null JWT
+        }catch (SignatureException | MalformedJwtException | ExpiredJwtException | UnsupportedJwtException |
+                IllegalArgumentException e) {
+            log.error("Invalid JWT token");
         }
         return false;
     }
@@ -74,16 +66,9 @@ public class JwtTokenProvider {
         try {
             Jwts.parser().setSigningKey(jwtSecret).parseClaimsJws(refreshToken);
             return true;
-        } catch (SignatureException ex) {
-            // Log invalid signature
-        } catch (MalformedJwtException ex) {
-            // Log malformed JWT
-        } catch (ExpiredJwtException ex) {
-            // Log expired JWT
-        } catch (UnsupportedJwtException ex) {
-            // Log unsupported JWT
-        } catch (IllegalArgumentException ex) {
-            // Log empty or null JWT
+        } catch (SignatureException | MalformedJwtException | ExpiredJwtException | UnsupportedJwtException |
+                 IllegalArgumentException e) {
+            log.error("Invalid refresh token");
         }
         return false;
     }
@@ -96,7 +81,7 @@ public class JwtTokenProvider {
                     .getBody();
             Date expiration = claims.getExpiration();
             return expiration.before(new Date());
-        } catch ( IllegalArgumentException e) {
+        } catch (IllegalArgumentException e) {
             return true;
         }
     }

@@ -1,11 +1,14 @@
 package com.civicconnect.auth_service.controller;
 
+import com.civicconnect.auth_service.config.JwtTokenProvider;
+import com.civicconnect.auth_service.dto.AuthResponseDto;
 import com.civicconnect.auth_service.model.User;
 import com.civicconnect.auth_service.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -17,37 +20,46 @@ import java.util.Optional;
 @RequestMapping("/api/auth")
 public class AuthController {
 
-    @Autowired
     private UserService userService;
+    private PasswordEncoder passwordEncoder;
+    private JwtTokenProvider jwtTokenProvider;
 
     @Autowired
-    private BCryptPasswordEncoder bCryptPasswordEncoder;
+    public AuthController(UserService userService, BCryptPasswordEncoder passwordEncoder, JwtTokenProvider jwtTokenProvider, JwtTokenProvider jwtTokenProvider1) {
+        this.userService = userService;
+        this.passwordEncoder = passwordEncoder;
+        this.jwtTokenProvider = jwtTokenProvider1;
+    }
 
     @PostMapping("/register")
-    public ResponseEntity<?> registerUser(@RequestBody User user) {
-        // Check if username is already taken
+    public ResponseEntity<AuthResponseDto> registerUser(@RequestBody User user) {
         Optional<User> existingUser = Optional.ofNullable(userService.findByUsername(user.getUsername()));
         if (existingUser.isPresent()) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).body("Username already exists");
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(null);
         }
-        userService.saveUser(user);
-        return ResponseEntity.status(HttpStatus.CREATED).body("User registered successfully");
+        User savedUser = userService.saveUser(user);
+        String token = jwtTokenProvider.generateToken(user.getUsername(), user.getRole());
+        String refreshToken = jwtTokenProvider.generateRefreshToken(user.getUsername());
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(new AuthResponseDto(token, refreshToken));
+
     }
 
     @PostMapping("/authenticate")
-    public ResponseEntity<?> authenticateUser(@RequestBody User loginUser) {
-        // Find user by username
+    public ResponseEntity<AuthResponseDto> authenticateUser(@RequestBody User loginUser) {
         Optional<User> existingUser = Optional.ofNullable(userService.findByUsername(loginUser.getUsername()));
         if (existingUser.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid credentials");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
         }
 
-        // Verify password
-        boolean passwordMatch = bCryptPasswordEncoder.matches(loginUser.getPassword(), existingUser.get().getPassword());
+        boolean passwordMatch = passwordEncoder.matches(loginUser.getPassword(), existingUser.get().getPassword());
         if (!passwordMatch) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid credentials");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
         }
 
-        return ResponseEntity.ok("User authenticated successfully");
+        String token = jwtTokenProvider.generateToken(existingUser.get().getUsername(), existingUser.get().getRole());
+        String refreshToken = jwtTokenProvider.generateRefreshToken(existingUser.get().getUsername());
+
+        return ResponseEntity.ok(new AuthResponseDto(token, refreshToken));
     }
 }
