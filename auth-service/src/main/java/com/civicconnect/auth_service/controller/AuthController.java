@@ -12,6 +12,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 import java.util.Optional;
@@ -61,5 +62,19 @@ public class AuthController {
         String refreshToken = jwtTokenProvider.generateRefreshToken(existingUser.get().getUsername());
 
         return ResponseEntity.ok(new AuthResponseDto(token, refreshToken));
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<AuthResponseDto> refreshAuthToken(@RequestHeader(name = "refreshToken") String refreshToken) {
+        if (jwtTokenProvider.validateToken(refreshToken)) {
+            String username = jwtTokenProvider.getUsernameFromToken(refreshToken);
+            User user = userService.findByUsername(username);
+            if (user != null) {
+                String newAuthToken = jwtTokenProvider.generateToken(username, user.getRole());
+                String newRefreshToken = jwtTokenProvider.generateRefreshToken(username);
+                return ResponseEntity.ok(new AuthResponseDto(newAuthToken, newRefreshToken));
+            }
+        }
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
     }
 }
